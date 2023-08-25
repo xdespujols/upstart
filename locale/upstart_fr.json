@@ -1,6 +1,6 @@
 {
   "settings": {
-  "options_languages": {"en":"Englais", "fr":"Francais"},
+  "options_languages": {"en":"Anglais", "fr":"Francais"},
   "options_groupsSortValues": {"manual":"Manuel", "az":"A-Z", "za":"Z-A", "newest":"Recent", "oldest":"Ancien"},
   "options_groupsViewValues": {"icon":"Icone", "list":"Liste"},
   "options_groupsPageColumnsValues": {"auto":"Auto", "1":"Un", "2":"Deux", "3":"Trois", "4":"Quatre", "5":"Cinq"},
