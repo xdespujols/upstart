@@ -10,20 +10,51 @@
 
 | # | Titre | Sévérité | Fichier(s) |
 |---|-------|----------|------------|
+| 0 | **Credentials Dropbox hardcodés dans le code source** | **CRITIQUE** | `settings.js:2037-2038` |
 | 1 | XSS via `innerHTML` sur données utilisateur | **Critique** | `functions.js`, `init.js`, `settings.js`, `popup.js` |
 | 2 | Injection d'URL arbitraire (`javascript:` protocol) | **Critique** | `functions.js:940` |
-| 3 | Token Dropbox stocké en `localStorage` | **Haute** | `functions.js`, `background.js` |
-| 4 | Permissions excessives dans le manifeste | **Haute** | `manifest.json` |
-| 5 | `web_accessible_resources` trop large | **Moyenne** | `manifest.json` |
-| 6 | Manifest Version 2 obsolète | **Moyenne** | `manifest.json` |
-| 7 | Permission `management` trop puissante | **Moyenne** | `manifest.json` |
-| 8 | Absence de validation à l'import | **Moyenne** | `functions.js` |
-| 9 | Journalisation de données sensibles | **Faible** | `background.js`, `functions.js` |
-| 10 | Boucle `for...in` sans `hasOwnProperty` | **Faible** | `background.js:44` |
+| 3 | Implémentation OAuth2 non sécurisée | **Critique** | `settings.js:2039-2080` |
+| 4 | Token Dropbox stocké en `localStorage` | **Haute** | `functions.js`, `background.js` |
+| 5 | Permissions excessives dans le manifeste | **Haute** | `manifest.json` |
+| 6 | Import de fichiers sans validation | **Haute** | `settings.js:1028-1193` |
+| 7 | Récupération de favicons depuis des sources non fiables (SSRF) | **Haute** | `functions.js:1586-1750` |
+| 8 | `web_accessible_resources` trop large | **Moyenne** | `manifest.json` |
+| 9 | Manifest Version 2 obsolète | **Moyenne** | `manifest.json` |
+| 10 | Permission `management` trop puissante | **Moyenne** | `manifest.json` |
+| 11 | Absence de validation stricte des URLs | **Moyenne** | `functions.js` |
+| 12 | Journalisation de données sensibles | **Faible** | `background.js`, `functions.js` |
+| 13 | Boucle `for...in` sans `hasOwnProperty` | **Faible** | `background.js:44` |
 
 ---
 
 ## Détail des vulnérabilités
+
+### 0. Credentials Dropbox hardcodés dans le code source (CRITIQUE — À corriger immédiatement)
+
+L'App Key et l'App Secret Dropbox sont écrits en clair dans le code JavaScript côté client.
+
+```js
+// settings.js:2037-2038
+let dbxAppKey = 'pb82c8abics6xcp'
+let dbxAppSecret = 'zp6z78ekv7pu6zd'
+
+// settings.js:2047 — envoyés dans chaque requête OAuth2
+headers.append('Authorization', 'Basic ' + btoa(dbxAppKey + ":" + dbxAppSecret))
+```
+
+**Impact :**
+- N'importe qui ayant accès à l'extension (téléchargée depuis le Web Store, ou au code source) peut extraire ces credentials.
+- Un attaquant peut usurper l'identité de l'application dans le flux OAuth2 Dropbox.
+- Permet d'échanger des codes d'autorisation contre des tokens d'accès utilisateur.
+- Ces credentials sont compromis dès lors qu'ils apparaissent dans un dépôt public.
+
+**Correction recommandée :**
+- **Révoquer immédiatement** ces credentials sur le portail développeur Dropbox.
+- Ne jamais stocker de secrets dans du code client.
+- Implémenter un backend proxy sécurisé pour l'échange de tokens OAuth2.
+- Utiliser le flux PKCE (Proof Key for Code Exchange) qui ne nécessite pas de secret côté client.
+
+---
 
 ### 1. XSS via `innerHTML` sur données utilisateur (Critique)
 
@@ -210,9 +241,12 @@ for (const key of Object.keys(changes)) { ... }
 
 ## Priorités de correction
 
-1. **[Immédiat]** Remplacer `innerHTML` par `textContent` pour toutes les données utilisateur (#1)
-2. **[Immédiat]** Valider le protocole des URLs avant assignation à `href` (#2)
-3. **[Court terme]** Migrer le token Dropbox vers `chrome.storage.local` (#3)
-4. **[Court terme]** Réduire les permissions du manifeste (#4)
-5. **[Moyen terme]** Migrer vers Manifest V3 (#6)
-6. **[Moyen terme]** Ajouter une validation des données importées (#8)
+1. **[Immédiat]** Révoquer les credentials Dropbox exposés (`pb82c8abics6xcp` / `zp6z78ekv7pu6zd`) et en générer de nouveaux (#0)
+2. **[Immédiat]** Implémenter un backend proxy pour l'échange OAuth2 ou utiliser PKCE (#0, #3)
+3. **[Immédiat]** Remplacer `innerHTML` par `textContent` pour toutes les données utilisateur (#1)
+4. **[Immédiat]** Valider le protocole des URLs avant assignation à `href` (#2)
+5. **[Court terme]** Migrer le token Dropbox vers `chrome.storage.local` (#4)
+6. **[Court terme]** Ajouter une validation stricte des données importées (#6)
+7. **[Court terme]** Réduire les permissions du manifeste — supprimer `<all_urls>`, `management`, `file:///*/` (#5)
+8. **[Moyen terme]** Migrer vers Manifest V3 (#9)
+9. **[Moyen terme]** Ajouter une validation d'URL stricte (whitelist de protocoles) (#11)
